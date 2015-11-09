@@ -17,7 +17,7 @@ Hello World!
 ```
 
 ## reverse_stdin.bf
-An even simple program, which reverses the input string provided as a second argument to the interpreter:
+An even simpler program, which reverses the input string provided as a second argument to the interpreter:
 
 ```
 rust-toys\brainfuck> main reverse_stdin.bf "The quick brown fox jumps over the lazy dog."
