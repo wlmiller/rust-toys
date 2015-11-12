@@ -11,7 +11,7 @@ I've included a couple of simple brainfuck programs.
 The classic.  Running is as follows:
 
 ```
-rust-toys\brainfuck> brainfuck hello_world
+rust-toys\brainfuck> brainfuck hello_world.bf
 Hello World!
 
 ```
