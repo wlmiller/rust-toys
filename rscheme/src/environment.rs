@@ -94,6 +94,14 @@ impl Environment {
     }
 }
 
+
+// I'd like to combine all or most of the following into a single function.
+// I tried making a general fn(fn) -> fn(_), but it didn't work.
+// Unfortunately, rust doesn't allow a function to capture external state, so there's no way
+// to get the specific function I want to call into the returned function.  You can do it
+// with a closure, but closures and fn pointers are not interchangeable.  I'm sure there's a
+// better way to handle this (possible by moving the whole thing to closures), but for the 
+// moment I'm stymied.
 fn begin(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
     let mut val: Result<Value, EvalError> = Ok(Value::Void);
     
@@ -557,11 +565,6 @@ fn map(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-// I'd like to combine all of the following (and many sets of the above) into a single function.
-// I tried making a general fn(fn(f64) -> f64) -> fn(_), but it didn't work.
-// Unfortunately, rust doesn't allow a function to capture external state, so there's no way
-// to get the specific function I want to call into the returned function.  You can do it
-// with a closure, but closures and fn pointers are not interchangeable.
 fn sin(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'sin' takes exactly one argument".to_string() })
