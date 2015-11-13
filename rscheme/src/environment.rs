@@ -57,6 +57,8 @@ impl Environment {
         env.insert("=".to_string(),      Value::Function(Rc::new(eq)));
         env.insert("equal?".to_string(), Value::Function(Rc::new(eq)));
         env.insert("not".to_string(),    Value::Function(Rc::new(not)));
+        env.insert("and".to_string(),    Value::Function(Rc::new(and)));
+        env.insert("or".to_string(),     Value::Function(Rc::new(or)));
         env.insert("list".to_string(),   Value::Function(Rc::new(list)));
         env.insert("car".to_string(),    Value::Function(Rc::new(car)));
         env.insert("cdr".to_string(),    Value::Function(Rc::new(cdr)));
@@ -421,6 +423,48 @@ fn not(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     match x {
        Value::Bool(val) => Ok(Value::Bool(!val)),
        _ => Err(EvalError { message: "Invalid type for 'not'".to_string() })
+    }
+}
+
+fn and(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+    if xs.len() == 0 {
+        return return Ok(Value::Bool(true));
+    }
+    
+    let x = interpreter.eval_node(xs[0].clone());
+    let mut ys = xs.clone();
+    ys.remove(0);
+    
+    if ys.len() == 0 {
+        x
+    } else {
+        match x {
+            Ok(Value::Bool(true))  => and(interpreter, ys),
+            Ok(Value::Bool(false)) => x,
+            Ok(_)                  => Err(EvalError { message: "Invalid type for 'and'".to_string() }),
+            err                    => err
+        }
+    }
+}
+
+fn or(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+    if xs.len() == 0 {
+        return return Ok(Value::Bool(false));
+    }
+    
+    let x = interpreter.eval_node(xs[0].clone());
+    let mut ys = xs.clone();
+    ys.remove(0);
+    
+    if ys.len() == 0 {
+        x
+    } else {
+        match x {
+            Ok(Value::Bool(false)) => or(interpreter, ys),
+            Ok(Value::Bool(true))  => x,
+            Ok(_)                  => Err(EvalError { message: "Invalid type for 'and'".to_string() }),
+            err                    => err
+        }
     }
 }
 
