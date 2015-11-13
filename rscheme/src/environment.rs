@@ -103,22 +103,22 @@ impl Environment {
 // with a closure, but closures and fn pointers are not interchangeable.  I'm sure there's a
 // better way to handle this (possible by moving the whole thing to closures), but for the 
 // moment I'm stymied.
-fn begin(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn begin(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     let mut val: Result<Value, EvalError> = Ok(Value::Void);
     
-    for node in xs {
-        val = interpreter.eval_node(node);
+    for node in xs.iter() {
+        val = interpreter.eval_node(&node);
     }
     
     val
 }
 
-fn add(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
-    if xs.len() != 2 {
-        return Err(EvalError { message: "'+' takes exactly two arguments".to_string() })
+fn add(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
+    if xs.len() == 0 {
+        return Ok(Value::Int(0));
     }
-    
-    let x = match interpreter.eval_node(xs[0].clone()) {
+
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => match val {
             Value::Bool(true)  => Value::Int(1),
             Value::Bool(false) => Value::Int(0),
@@ -127,7 +127,8 @@ fn add(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
         err      => return err
     };
     
-    let y = match interpreter.eval_node(xs[1].clone()) {
+    let ys = xs[1..].to_vec();
+    let y = match add(interpreter, &ys) {
         Ok(val) => match val {
             Value::Bool(true)  => Value::Int(1),
             Value::Bool(false) => Value::Int(0),
@@ -146,12 +147,20 @@ fn add(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn sub(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
-    if xs.len() != 2 {
-        return Err(EvalError { message: "'' takes exactly two arguments".to_string() })
+fn sub(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
+    if xs.len() == 0 {
+        return Ok(Value::Int(0));
     }
 
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
+        Ok(val) => match val {
+            Value::Bool(true)  => Value::Int(1),
+            Value::Bool(false) => Value::Int(0),
+            val                => val
+        },
+        err      => return err
+    };
+    let y = match interpreter.eval_node(&xs[1]) {
         Ok(val) => match val {
             Value::Bool(true)  => Value::Int(1),
             Value::Bool(false) => Value::Int(0),
@@ -160,31 +169,39 @@ fn sub(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
         err      => return err
     };
     
-    let y = match interpreter.eval_node(xs[1].clone()) {
-        Ok(val) => match val {
-            Value::Bool(true)  => Value::Int(1),
-            Value::Bool(false) => Value::Int(0),
-            val                => val
-        },
-        err      => return err
-    };
-
-    match (x, y) {
-        (Value::Int(x), Value::Int(y))     => Ok(Value::Int(x - y)),
-        (Value::Float(x), Value::Int(y))   => Ok(Value::Float(x - y as f64)),
-        (Value::Int(x), Value::Float(y))   => Ok(Value::Float(x as f64 - y)),
-        (Value::Float(x), Value::Float(y)) => Ok(Value::Float(x - y)),
-        (Value::Symbol(val), _) | (_, Value::Symbol(val)) => Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
-        _                                  => Err(EvalError { message: "Invalid types for '-'".to_string() })
+    if xs.len() < 3 {
+        match (x, y) {
+            (Value::Int(x), Value::Int(y))     => Ok(Value::Int(x - y)),
+            (Value::Float(x), Value::Int(y))   => Ok(Value::Float(x - y as f64)),
+            (Value::Int(x), Value::Float(y))   => Ok(Value::Float(x as f64 - y)),
+            (Value::Float(x), Value::Float(y)) => Ok(Value::Float(x - y)),
+            (Value::Symbol(val), _) | (_, Value::Symbol(val)) => Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
+            _                                  => Err(EvalError { message: "Invalid types for '-'".to_string() })
+        }
+    } else {
+        let x_sub_y = match (x, y) {
+            (Value::Int(x), Value::Int(y))     => Node::Int(x - y),
+            (Value::Float(x), Value::Int(y))   => Node::Float(x - y as f64),
+            (Value::Int(x), Value::Float(y))   => Node::Float(x as f64 - y),
+            (Value::Float(x), Value::Float(y)) => Node::Float(x - y),
+            (Value::Symbol(val), _) | (_, Value::Symbol(val)) => return Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
+            _                                  => return Err(EvalError { message: "Invalid types for '-'".to_string() })
+        };
+    
+        let mut xs = xs.clone();
+        xs.remove(0);
+        xs.remove(0);
+        xs.insert(0, x_sub_y);
+        sub(interpreter, &xs)
     }
 }
 
-fn mul(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
-    if xs.len() != 2 {
-        return Err(EvalError { message: "'*' takes exactly two arguments".to_string() })
+fn mul(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
+    if xs.len() == 0 {
+        return Ok(Value::Int(1));
     }
-    
-    let x = match interpreter.eval_node(xs[0].clone()) {
+
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => match val {
             Value::Bool(true)  => Value::Int(1),
             Value::Bool(false) => Value::Int(0),
@@ -193,7 +210,8 @@ fn mul(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
         err      => return err
     };
     
-    let y = match interpreter.eval_node(xs[1].clone()) {
+    let ys = xs[1..].to_vec();
+    let y = match mul(interpreter, &ys) {
         Ok(val) => match val {
             Value::Bool(true)  => Value::Int(1),
             Value::Bool(false) => Value::Int(0),
@@ -212,12 +230,20 @@ fn mul(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn div(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
-    if xs.len() != 2 {
-        return Err(EvalError { message: "'/' takes exactly two arguments".to_string() })
+fn div(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
+    if xs.len() == 1 {
+        return Ok(Value::Int(1));
     }
-    
-    let x = match interpreter.eval_node(xs[0].clone()) {
+
+    let x = match interpreter.eval_node(&xs[0]) {
+        Ok(val) => match val {
+            Value::Bool(true)  => Value::Int(1),
+            Value::Bool(false) => Value::Int(0),
+            val                => val
+        },
+        err      => return err
+    };
+    let y = match interpreter.eval_node(&xs[1]) {
         Ok(val) => match val {
             Value::Bool(true)  => Value::Int(1),
             Value::Bool(false) => Value::Int(0),
@@ -226,38 +252,49 @@ fn div(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
         err      => return err
     };
     
-    let y = match interpreter.eval_node(xs[1].clone()) {
-        Ok(val) => match val {
-            Value::Bool(true)  => Value::Int(1),
-            Value::Bool(false) => Value::Int(0),
-            val                => val
-        },
-        err      => return err
-    };
+    if xs.len() < 3 {
+        match (x, y) {
+            (_, Value::Int(0)) | (_, Value::Float(0.0)) => Err(EvalError { message: "Invalid division by zero".to_string() }),
+            (Value::Int(x), Value::Int(y))     => Ok(Value::Int(x / y)),
+            (Value::Float(x), Value::Int(y))   => Ok(Value::Float(x / y as f64)),
+            (Value::Int(x), Value::Float(y))   => Ok(Value::Float(x as f64 / y)),
+            (Value::Float(x), Value::Float(y)) => Ok(Value::Float(x / y)),
+            (Value::Symbol(val), _) | (_, Value::Symbol(val)) => Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
+            _                                  => Err(EvalError { message: "Invalid types for '/'".to_string() })
+        }
+    } else {
+        let x_div_y = match (x, y) {
+            (_, Value::Int(0)) | (_, Value::Float(0.0)) => return Err(EvalError { message: "Invalid division by zero".to_string() }),
+            (Value::Int(x), Value::Int(y))     => Node::Int(x / y),
+            (Value::Float(x), Value::Int(y))   => Node::Float(x / y as f64),
+            (Value::Int(x), Value::Float(y))   => Node::Float(x as f64 / y),
+            (Value::Float(x), Value::Float(y)) => Node::Float(x / y),
+            (Value::Symbol(val), _) | (_, Value::Symbol(val)) => return Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
+            _                                  => return Err(EvalError { message: "Invalid types for '/'".to_string() })
+        };
     
-    match (x, y) {
-        (_, Value::Int(0)) | (_, Value::Float(0.0)) => Err(EvalError { message: "Invalid division by zero".to_string() }),
-        (Value::Int(x), Value::Int(y))     => Ok(Value::Int(x / y)),
-        (Value::Float(x), Value::Int(y))   => Ok(Value::Float(x / y as f64)),
-        (Value::Int(x), Value::Float(y))   => Ok(Value::Float(x as f64 / y)),
-        (Value::Float(x), Value::Float(y)) => Ok(Value::Float(x / y)),
-        (Value::Symbol(val), _) | (_, Value::Symbol(val)) => Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
-        _                                  => Err(EvalError { message: "Invalid types for '/'".to_string() })
+        let mut xs = xs.clone();
+        xs.remove(0);
+        xs.remove(0);
+        xs.insert(0, x_div_y);
+        div(interpreter, &xs)
     }
 }
 
-fn pow(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
-    if xs.len() != 2 {
-        return Err(EvalError { message: "'pow' takes exactly two arguments".to_string() })
+fn pow(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
+    if xs.len() == 0 {
+        return Ok(Value::Int(0));
     }
-    
-    let x = match interpreter.eval_node(xs[0].clone()) {
-        Ok(val) => val,
-        err     => return err
+
+    let x = match interpreter.eval_node(&xs[0]) {
+        Ok(val)  => val,
+        err      => return err
     };
-    let y = match interpreter.eval_node(xs[1].clone()) {
-        Ok(val) => val,
-        err     => return err
+    
+    let ys = xs[1..].to_vec();
+    let y = match add(interpreter, &ys) {
+        Ok(val)  => val,
+        err      => return err
     };
     match (x, y) {
         (Value::Int(x), Value::Int(y))           => Ok(Value::Float((x as f64).powi(y))),
@@ -269,13 +306,13 @@ fn pow(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-pub fn def(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+pub fn def(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 2 {
         return Err(EvalError { message: "'define' takes exactly two arguments".to_string() })
     }
     
     let x = xs[0].clone();
-    let y = match interpreter.eval_node(xs[1].clone()) {
+    let y = match interpreter.eval_node(&xs[1]) {
         Ok(val) => val,
         err     => return err
     };
@@ -286,17 +323,17 @@ pub fn def(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalEr
     }
 }
 
-fn gt(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn gt(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 2 {
         return Err(EvalError { message: "'>' takes exactly two arguments".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
     
-    let y = match interpreter.eval_node(xs[1].clone()) {
+    let y = match interpreter.eval_node(&xs[1]) {
         Ok(val) => val,
         err     => return err
     };
@@ -309,18 +346,17 @@ fn gt(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> 
         _                                  => Err(EvalError { message: "Invalid types for '>'".to_string() })
     }
 }
-
-fn gte(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn gte(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 2 {
         return Err(EvalError { message: "'>=' takes exactly two arguments".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
     
-    let y = match interpreter.eval_node(xs[1].clone()) {
+    let y = match interpreter.eval_node(&xs[1]) {
         Ok(val) => val,
         err     => return err
     };
@@ -334,17 +370,17 @@ fn gte(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn lt(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn lt(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 2 {
         return Err(EvalError { message: "'<' takes exactly two arguments".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
     
-    let y = match interpreter.eval_node(xs[1].clone()) {
+    let y = match interpreter.eval_node(&xs[1]) {
         Ok(val) => val,
         err     => return err
     };
@@ -358,17 +394,17 @@ fn lt(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> 
     }
 }
 
-fn lte(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn lte(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 2 {
         return Err(EvalError { message: "'<=' takes exactly two arguments".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
     
-    let y = match interpreter.eval_node(xs[1].clone()) {
+    let y = match interpreter.eval_node(&xs[1]) {
         Ok(val) => val,
         err     => return err
     };
@@ -382,17 +418,17 @@ fn lte(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn eq(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn eq(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 2 {
         return Err(EvalError { message: "'=' takes exactly two arguments".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
     
-    let y = match interpreter.eval_node(xs[1].clone()) {
+    let y = match interpreter.eval_node(&xs[1]) {
         Ok(val) => val,
         err     => return err
     };
@@ -407,12 +443,12 @@ fn eq(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> 
     }
 }
 
-fn not(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn not(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'not' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
@@ -422,20 +458,19 @@ fn not(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn and(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn and(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() == 0 {
         return return Ok(Value::Bool(true));
     }
     
-    let x = interpreter.eval_node(xs[0].clone());
-    let mut ys = xs.clone();
-    ys.remove(0);
+    let x = interpreter.eval_node(&xs[0]);
+    let ys = xs[1..].to_vec().clone();
     
     if ys.len() == 0 {
         x
     } else {
         match x {
-            Ok(Value::Bool(true))  => and(interpreter, ys),
+            Ok(Value::Bool(true))  => and(interpreter, &ys),
             Ok(Value::Bool(false)) => x,
             Ok(_)                  => Err(EvalError { message: "Invalid type for 'and'".to_string() }),
             err                    => err
@@ -443,20 +478,19 @@ fn and(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn or(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn or(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() == 0 {
         return return Ok(Value::Bool(false));
     }
     
-    let x = interpreter.eval_node(xs[0].clone());
-    let mut ys = xs.clone();
-    ys.remove(0);
+    let x = interpreter.eval_node(&xs[0]);
+    let ys = xs[1..].to_vec().clone();
     
     if ys.len() == 0 {
         x
     } else {
         match x {
-            Ok(Value::Bool(false)) => or(interpreter, ys),
+            Ok(Value::Bool(false)) => or(interpreter, &ys),
             Ok(Value::Bool(true))  => x,
             Ok(_)                  => Err(EvalError { message: "Invalid type for 'and'".to_string() }),
             err                    => err
@@ -464,11 +498,11 @@ fn or(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> 
     }
 }
 
-fn list(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn list(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     let mut vals: Vec<Value> = Vec::new();
     
     for node in xs {
-        vals.push(match interpreter.eval_node(node) {
+        vals.push(match interpreter.eval_node(&node) {
             Ok(val)  => val,
             err      => return err
         });
@@ -477,12 +511,12 @@ fn list(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError
     Ok(Value::List(vals))
 }
 
-fn emptyq(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn emptyq(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'empty?' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
@@ -492,12 +526,12 @@ fn emptyq(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalErr
     }
 }
 
-fn car(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn car(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'car' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
@@ -507,12 +541,12 @@ fn car(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn cdr(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn cdr(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'cdr' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
@@ -526,16 +560,16 @@ fn cdr(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn cons(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn cons(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 2 {
         return Err(EvalError { message: "'cons' takes exactly two arguments".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
-    let ys = match interpreter.eval_node(xs[1].clone()) {
+    let ys = match interpreter.eval_node(&xs[1]) {
         Ok(val) => val,
         err     => return err
     };
@@ -549,38 +583,38 @@ fn cons(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError
     }
 }
 
-fn if_fn(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn if_fn(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 3 {
         return Err(EvalError { message: "'if' takes exactly three arguments".to_string() })
     }
     
-    let test: bool = match interpreter.eval_node(xs[0].clone()) {
+    let test: bool = match interpreter.eval_node(&xs[0]) {
         Ok(Value::Bool(val)) => val,
         _                    => return Err(EvalError { message: "'if' requires a boolean test".to_string() })
     };
     if test {
-        interpreter.eval_node(xs[1].clone())
+        interpreter.eval_node(&xs[1])
     } else {
-        interpreter.eval_node(xs[2].clone())
+        interpreter.eval_node(&xs[2])
     }
 }
 
-fn map(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>  {
+fn map(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError>  {
     if xs.len() != 2 {
         return Err(EvalError { message: "'map' takes exactly two arguments".to_string() })
     }
     
-    let func = match interpreter.eval_node(xs[0].clone()) {
+    let func = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
-    let list = match interpreter.eval_node(xs[1].clone()) {
+    let list = match interpreter.eval_node(&xs[1]) {
         Ok(val) => val,
         err     => return err
     };
     match (func, list) {
         (Value::Function(_, func), Value::List(vals)) => {
-            let res_slice = vals.iter().map(|i| func(interpreter, vec![interpreter::convert_to_node(i.clone())]));
+            let res_slice = vals.iter().map(|i| func(interpreter, &vec![interpreter::convert_to_node(i.clone())]));
             let mut res: Vec<Value> = Vec::new();
             for r in res_slice {
                 match r {
@@ -594,7 +628,7 @@ fn map(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
             let mut res: Vec<Value> = Vec::new();
 
             for val in vals.clone() {
-                match interpreter.eval_lambda(lambda.clone(), vec![xs[0].clone(), interpreter::convert_to_node(val)]) {
+                match interpreter.eval_lambda(lambda.clone(), &vec![xs[0].clone(), interpreter::convert_to_node(val)]) {
                     Ok(val) => res.push(val),
                     err => return err 
                 }
@@ -605,12 +639,12 @@ fn map(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn sin(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn sin(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'sin' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
@@ -621,12 +655,12 @@ fn sin(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn cos(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn cos(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'cos' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
@@ -637,12 +671,12 @@ fn cos(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn tan(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn tan(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'tan' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
@@ -653,12 +687,12 @@ fn tan(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn asin(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn asin(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'asin' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
@@ -669,12 +703,12 @@ fn asin(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError
     }
 }
 
-fn acos(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn acos(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'acos' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
@@ -685,12 +719,12 @@ fn acos(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError
     }
 }
 
-fn atan(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn atan(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'atan' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
@@ -701,12 +735,12 @@ fn atan(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError
     }
 }
 
-fn exp(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn exp(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'exp' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
@@ -717,12 +751,12 @@ fn exp(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn log(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn log(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'log' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };
@@ -733,12 +767,12 @@ fn log(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
     }
 }
 
-fn log10(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError> {
+fn log10(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'log10' takes exactly one argument".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
+    let x = match interpreter.eval_node(&xs[0]) {
         Ok(val) => val,
         err     => return err
     };

@@ -13,7 +13,7 @@ pub enum Value {
     Symbol(String),
     Literal(String),
     List(Vec<Value>),
-    Function(&'static str, Rc<fn(&mut Interpreter, Vec<Node>) -> Result<Value, EvalError>>),
+    Function(&'static str, Rc<fn(&mut Interpreter, &Vec<Node>) -> Result<Value, EvalError>>),
     Lambda(Lambda),
     Void
 }
@@ -42,7 +42,7 @@ impl fmt::Display for Value {
             Value::Lambda(ref lambda) => {
                 let mut params_str = String::new();
                 let mut sep = String::new();
-                for p in lambda.clone().params {
+                for p in &lambda.params {
                     params_str = format!("{}{}{}", params_str, sep, p);
                     sep = " ".to_string();
                 }
@@ -79,23 +79,23 @@ impl Interpreter {
     }
 
     pub fn eval(&mut self, tree: Node) -> Result<Value, EvalError> {
-        self.eval_node(tree.clone())
+        self.eval_node(&tree)
     }
     
-    pub fn eval_node(&mut self, node: Node) -> Result<Value, EvalError> {
+    pub fn eval_node(&mut self, node: &Node) -> Result<Value, EvalError> {
         match node {
-            Node::ValueWrapper(val) => Ok(*val),
-            Node::Int(val)    => Ok(Value::Int(val)),
-            Node::Float(val)  => Ok(Value::Float(val)),
-            Node::Bool(val)   => Ok(Value::Bool(val)),
-            Node::Symbol(val) => {
+            &Node::ValueWrapper(ref val)  => Ok((**val).clone()),
+            &Node::Int(val)               => Ok(Value::Int(val)),
+            &Node::Float(val)             => Ok(Value::Float(val)),
+            &Node::Bool(val)              => Ok(Value::Bool(val)),
+            &Node::Symbol(ref val)            => {
                 match self.env.get(&val) {
                     Some(res) => Ok(res.clone()),
-                    None => Ok(Value::Symbol(val))
+                    None => Ok(Value::Symbol(val.clone()))
                 }
             }
-            Node::List(nodes)  => {
-                let func_result = self.eval_node(nodes[0].clone());
+            &Node::List(ref nodes)  => {
+                let func_result = self.eval_node(&nodes[0]);
                 match func_result {
                     Ok(func_val) => {
                         match func_val {
@@ -115,9 +115,8 @@ impl Interpreter {
                                 }
                             },
                             Value::Function(_, func) => {
-                                let mut args: Vec<Node> = nodes.clone();
-                                args.remove(0);
-                                match func(self, args) {
+                                let args = nodes[1..].to_vec();
+                                match func(self, &args) {
                                     Ok(val) => Ok(val),
                                     Err(err) => Err(err)
                                  }
@@ -136,7 +135,7 @@ impl Interpreter {
         }
     }
     
-    pub fn eval_lambda(&mut self, lambda: Lambda, nodes: Vec<Node>) -> Result<Value, EvalError> {
+    pub fn eval_lambda(&mut self, lambda: Lambda, nodes: &Vec<Node>) -> Result<Value, EvalError> {
         let mut env = Environment::new_empty(Some(Box::new(self.env.clone())));
         let params = lambda.params;
         let body = lambda.body;
@@ -148,7 +147,7 @@ impl Interpreter {
         for i in 0..params.len() {
             match params[i] {
                 Node::Symbol(ref val) => {
-                    match self.eval_node(nodes[i + 1].clone()) {
+                    match self.eval_node(&nodes[i + 1]) {
                         Ok(res) => env.set(val.clone(), res),
                         Err(err) => return Err(err)
                     }
