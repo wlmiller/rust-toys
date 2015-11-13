@@ -47,6 +47,7 @@ impl Environment {
         env.insert("*".to_string(),      Value::Function("*", Rc::new(mul)));
         env.insert("/".to_string(),      Value::Function("/", Rc::new(div)));
         env.insert("pow".to_string(),    Value::Function("pow", Rc::new(pow)));
+        env.insert("expt".to_string(),   Value::Function("expt", Rc::new(pow)));
         env.insert("define".to_string(), Value::Function("define", Rc::new(def)));
         env.insert("set!".to_string(),   Value::Function("set!", Rc::new(def)));
         env.insert(">".to_string(),      Value::Function(">", Rc::new(gt)));
@@ -282,20 +283,19 @@ fn div(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError
 }
 
 fn pow(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
-    if xs.len() == 0 {
-        return Ok(Value::Int(0));
+    if xs.len() != 2 {
+        return Err(EvalError { message: "'expt' takes exactly two arguments".to_string() })
     }
 
     let x = match interpreter.eval_node(&xs[0]) {
         Ok(val)  => val,
         err      => return err
     };
-    
-    let ys = xs[1..].to_vec();
-    let y = match add(interpreter, &ys) {
+    let y = match interpreter.eval_node(&xs[1]) {
         Ok(val)  => val,
         err      => return err
     };
+
     match (x, y) {
         (Value::Int(x), Value::Int(y))           => Ok(Value::Float((x as f64).powi(y))),
         (Value::Float(x), Value::Int(y))         => Ok(Value::Float(x.powi(y))),
