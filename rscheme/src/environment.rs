@@ -11,13 +11,12 @@ use parser::Node as Node;
 #[derive(Clone)]
 pub struct Lambda {
     pub params: Vec<Node>,
-    pub body: Node,
-    pub name: String
+    pub body: Node
 }
 
 impl Lambda {
     pub fn new(params: Vec<Node>, body: Node) -> Lambda {
-        Lambda { params: params, body: body, name: "aaa".to_string() }
+        Lambda { params: params, body: body }
     }
 }
 
@@ -42,39 +41,39 @@ impl Environment {
     
     pub fn initialize(&mut self) {
         let mut env = HashMap::new();
-        env.insert("begin".to_string(),  Value::Function(Rc::new(begin)));
-        env.insert("+".to_string(),      Value::Function(Rc::new(add)));
-        env.insert("-".to_string(),      Value::Function(Rc::new(sub)));
-        env.insert("*".to_string(),      Value::Function(Rc::new(mul)));
-        env.insert("/".to_string(),      Value::Function(Rc::new(div)));
-        env.insert("pow".to_string(),    Value::Function(Rc::new(pow)));
-        env.insert("define".to_string(), Value::Function(Rc::new(def)));
-        env.insert("set!".to_string(),   Value::Function(Rc::new(def)));
-        env.insert(">".to_string(),      Value::Function(Rc::new(gt)));
-        env.insert(">=".to_string(),     Value::Function(Rc::new(gte)));
-        env.insert("<".to_string(),      Value::Function(Rc::new(lt)));
-        env.insert("<=".to_string(),     Value::Function(Rc::new(lte)));
-        env.insert("=".to_string(),      Value::Function(Rc::new(eq)));
-        env.insert("equal?".to_string(), Value::Function(Rc::new(eq)));
-        env.insert("not".to_string(),    Value::Function(Rc::new(not)));
-        env.insert("and".to_string(),    Value::Function(Rc::new(and)));
-        env.insert("or".to_string(),     Value::Function(Rc::new(or)));
-        env.insert("list".to_string(),   Value::Function(Rc::new(list)));
-        env.insert("car".to_string(),    Value::Function(Rc::new(car)));
-        env.insert("cdr".to_string(),    Value::Function(Rc::new(cdr)));
-        env.insert("cons".to_string(),   Value::Function(Rc::new(cons)));
-        env.insert("empty?".to_string(), Value::Function(Rc::new(emptyq)));
-        env.insert("if".to_string(),     Value::Function(Rc::new(if_fn)));
-        env.insert("map".to_string(),    Value::Function(Rc::new(map)));
-        env.insert("sin".to_string(),    Value::Function(Rc::new(sin)));
-        env.insert("cos".to_string(),    Value::Function(Rc::new(cos)));
-        env.insert("tan".to_string(),    Value::Function(Rc::new(tan)));
-        env.insert("asin".to_string(),   Value::Function(Rc::new(asin)));
-        env.insert("acos".to_string(),   Value::Function(Rc::new(acos)));
-        env.insert("atan".to_string(),   Value::Function(Rc::new(atan)));
-        env.insert("exp".to_string(),    Value::Function(Rc::new(exp)));
-        env.insert("log".to_string(),    Value::Function(Rc::new(log)));
-        env.insert("log10".to_string(),  Value::Function(Rc::new(log10)));
+        env.insert("begin".to_string(),  Value::Function("begin", Rc::new(begin)));
+        env.insert("+".to_string(),      Value::Function("+", Rc::new(add)));
+        env.insert("-".to_string(),      Value::Function("-", Rc::new(sub)));
+        env.insert("*".to_string(),      Value::Function("*", Rc::new(mul)));
+        env.insert("/".to_string(),      Value::Function("/", Rc::new(div)));
+        env.insert("pow".to_string(),    Value::Function("pow", Rc::new(pow)));
+        env.insert("define".to_string(), Value::Function("define", Rc::new(def)));
+        env.insert("set!".to_string(),   Value::Function("set!", Rc::new(def)));
+        env.insert(">".to_string(),      Value::Function(">", Rc::new(gt)));
+        env.insert(">=".to_string(),     Value::Function(">=", Rc::new(gte)));
+        env.insert("<".to_string(),      Value::Function("<", Rc::new(lt)));
+        env.insert("<=".to_string(),     Value::Function("<=", Rc::new(lte)));
+        env.insert("=".to_string(),      Value::Function("=", Rc::new(eq)));
+        env.insert("equal?".to_string(), Value::Function("equal?", Rc::new(eq)));
+        env.insert("not".to_string(),    Value::Function("not", Rc::new(not)));
+        env.insert("and".to_string(),    Value::Function("and", Rc::new(and)));
+        env.insert("or".to_string(),     Value::Function("or", Rc::new(or)));
+        env.insert("list".to_string(),   Value::Function("list", Rc::new(list)));
+        env.insert("car".to_string(),    Value::Function("car", Rc::new(car)));
+        env.insert("cdr".to_string(),    Value::Function("cdr", Rc::new(cdr)));
+        env.insert("cons".to_string(),   Value::Function("cons", Rc::new(cons)));
+        env.insert("empty?".to_string(), Value::Function("empty?", Rc::new(emptyq)));
+        env.insert("if".to_string(),     Value::Function("if", Rc::new(if_fn)));
+        env.insert("map".to_string(),    Value::Function("map", Rc::new(map)));
+        env.insert("sin".to_string(),    Value::Function("sin", Rc::new(sin)));
+        env.insert("cos".to_string(),    Value::Function("cos", Rc::new(cos)));
+        env.insert("tan".to_string(),    Value::Function("tan", Rc::new(tan)));
+        env.insert("asin".to_string(),   Value::Function("asin", Rc::new(asin)));
+        env.insert("acos".to_string(),   Value::Function("acos", Rc::new(acos)));
+        env.insert("atan".to_string(),   Value::Function("atan", Rc::new(atan)));
+        env.insert("exp".to_string(),    Value::Function("exp", Rc::new(exp)));
+        env.insert("log".to_string(),    Value::Function("log", Rc::new(log)));
+        env.insert("log10".to_string(),  Value::Function("log10", Rc::new(log10)));
         env.insert("pi".to_string(),     Value::Float(consts::PI));
         env.insert("e".to_string(),      Value::Float(consts::E));
         
@@ -275,17 +274,14 @@ pub fn def(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalEr
         return Err(EvalError { message: "'define' takes exactly two arguments".to_string() })
     }
     
-    let x = match interpreter.eval_node(xs[0].clone()) {
-        Ok(val) => val,
-        err     => return err
-    };
+    let x = xs[0].clone();
     let y = match interpreter.eval_node(xs[1].clone()) {
         Ok(val) => val,
         err     => return err
     };
 
     match (x, y) {
-        (Value::Symbol(label), val) => { interpreter.env.set(label, val); Ok(Value::Void) },
+        (Node::Symbol(label), val) => { interpreter.env.set(label, val); Ok(Value::Void) },
         _ => Err(EvalError { message: format!("Can't define {}", xs[0]).to_string() })
     }
 }
@@ -583,7 +579,7 @@ fn map(interpreter: &mut Interpreter, xs: Vec<Node>) -> Result<Value, EvalError>
         err     => return err
     };
     match (func, list) {
-        (Value::Function(func), Value::List(vals)) => {
+        (Value::Function(_, func), Value::List(vals)) => {
             let res_slice = vals.iter().map(|i| func(interpreter, vec![interpreter::convert_to_node(i.clone())]));
             let mut res: Vec<Value> = Vec::new();
             for r in res_slice {

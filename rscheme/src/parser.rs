@@ -17,11 +17,21 @@ pub enum Node {
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.clone() {
-            Node::Symbol(val) => { write!(f, "{}", val) },
-            Node::Int(val)    => { write!(f, "{}", val) },
-            Node::Float(val)  => { write!(f, "{}", val)  },
-            Node::Bool(val)   => { write!(f, "{}", val)  },
-            _                 => { write!(f, "_") } 
+            Node::Symbol(val) => write!(f, "{}", val),
+            Node::Int(val)    => write!(f, "{}", val),
+            Node::Float(val)  => write!(f, "{}", val) ,
+            Node::Bool(true)  => write!(f, "#t"),
+            Node::Bool(false) => write!(f, "#f"),
+            Node::List(vals)  => { 
+                let mut output = String::new();
+                let mut sep = String::new();
+                for val in vals {
+                    output = format!("{}{}{}",output,sep,val.clone());
+                    sep = " ".to_string();
+                }
+                write!(f, "({})", output)
+            },
+            _ => write!(f, "_")
         }
     }
 }

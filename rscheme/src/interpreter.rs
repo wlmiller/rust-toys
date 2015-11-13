@@ -13,7 +13,7 @@ pub enum Value {
     Symbol(String),
     Literal(String),
     List(Vec<Value>),
-    Function(Rc<fn(&mut Interpreter, Vec<Node>) -> Result<Value, EvalError>>),
+    Function(&'static str, Rc<fn(&mut Interpreter, Vec<Node>) -> Result<Value, EvalError>>),
     Lambda(Lambda),
     Void
 }
@@ -25,24 +25,31 @@ pub fn convert_to_node(val: Value) -> Node {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Value::Int(val)        => write!(f, "{}", val),
-            Value::Float(val)      => write!(f, "{}", val),
-            Value::Bool(true)      => write!(f, "#t"),
-            Value::Bool(false)     => write!(f, "#f"),
+            Value::Int(val)          => write!(f, "{}", val),
+            Value::Float(val)        => write!(f, "{}", val),
+            Value::Bool(true)        => write!(f, "#t"),
+            Value::Bool(false)       => write!(f, "#f"),
             Value::Symbol(ref val) | Value::Literal(ref val) => write!(f, "{}", val),
-            Value::List(ref vals)         => {
-                let mut output = "".to_string();
-                let mut sep = "".to_string();
+            Value::List(ref vals)    => {
+                let mut output = String::new();
+                let mut sep = String::new();
                 for val in vals {
                     output = format!("{}{}{}",output,sep,val.clone());
                     sep = " ".to_string();
                 }
                 write!(f, "({})", output)
             }
-            // TODO: make actual Display functions for lambdas and functions
-            Value::Lambda(_)       => write!(f, "lambda"),
-            Value::Function(_)     => write!(f, "function"),
-            Value::Void            => write!(f, "void")
+            Value::Lambda(ref lambda) => {
+                let mut params_str = String::new();
+                let mut sep = String::new();
+                for p in lambda.clone().params {
+                    params_str = format!("{}{}{}", params_str, sep, p);
+                    sep = " ".to_string();
+                }
+                write!(f, "(lambda ({}) ({}))", params_str, lambda.body)
+            },
+            Value::Function(name, _) => write!(f, "{}", name),
+            Value::Void            => write!(f, "()")
         }
     }
 }
@@ -107,7 +114,7 @@ impl Interpreter {
                                     Err(EvalError { message: format!("Unknown function {}", val).to_string() })
                                 }
                             },
-                            Value::Function(func) => {
+                            Value::Function(_, func) => {
                                 let mut args: Vec<Node> = nodes.clone();
                                 args.remove(0);
                                 match func(self, args) {
