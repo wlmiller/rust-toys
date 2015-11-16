@@ -63,7 +63,10 @@ impl Environment {
         env.insert("car".to_string(),    Value::Function("car", Rc::new(car)));
         env.insert("cdr".to_string(),    Value::Function("cdr", Rc::new(cdr)));
         env.insert("cons".to_string(),   Value::Function("cons", Rc::new(cons)));
-        env.insert("empty?".to_string(), Value::Function("empty?", Rc::new(emptyq)));
+        env.insert("append".to_string(), Value::Function("append", Rc::new(append)));
+        env.insert("empty?".to_string(), Value::Function("empty?", Rc::new(emptyq))); 
+        env.insert("null?".to_string(),  Value::Function("null?", Rc::new(emptyq)));
+        env.insert("length".to_string(), Value::Function("length", Rc::new(length)));
         env.insert("if".to_string(),     Value::Function("if", Rc::new(if_fn)));
         env.insert("map".to_string(),    Value::Function("map", Rc::new(map)));
         env.insert("sin".to_string(),    Value::Function("sin", Rc::new(sin)));
@@ -106,8 +109,10 @@ impl Environment {
 // moment I'm stymied.
 fn begin(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     let mut val: Result<Value, EvalError> = Ok(Value::Void);
+    let env = Environment::new_empty(Some(Box::new(interpreter.env.clone())));
+    let mut interpreter = Interpreter::new_with_env(env.clone());
     
-    for node in xs.iter() {
+    for node in xs {
         val = interpreter.eval_node(&node);
     }
     
@@ -220,7 +225,6 @@ fn mul(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError
         },
         err      => return err
     };
-    
     match (x, y) {
         (Value::Int(x), Value::Int(y))     => Ok(Value::Int(x * y)),
         (Value::Float(x), Value::Int(y))   => Ok(Value::Float(x * y as f64)),
@@ -526,6 +530,21 @@ fn emptyq(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalEr
     }
 }
 
+fn length(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
+    if xs.len() != 1 {
+        return Err(EvalError { message: "'length' takes exactly one argument".to_string() })
+    }
+    
+    let x = match interpreter.eval_node(&xs[0]) {
+        Ok(val) => val,
+        err     => return err
+    };
+    match x {
+        Value::List(vals) => Ok(Value::Int(vals.len() as i32)),
+        _                 => Err(EvalError { message: "Invalid type for 'length'".to_string() })
+    }
+}
+
 fn car(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 1 {
         return Err(EvalError { message: "'car' takes exactly one argument".to_string() })
@@ -583,6 +602,30 @@ fn cons(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalErro
     }
 }
 
+fn append(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
+    if xs.len() != 2 {
+        return Err(EvalError { message: "'cons' takes exactly two arguments".to_string() })
+    }
+    
+    let ys = match interpreter.eval_node(&xs[0]) {
+        Ok(val) => val,
+        err     => return err
+    };
+    let zs = match interpreter.eval_node(&xs[1]) {
+        Ok(val) => val,
+        err     => return err
+    };
+    match (ys, zs) {
+        (Value::List(xs), Value::List(ys)) => {
+            let mut xs = xs.clone();
+            let mut ys = ys.clone();
+            xs.append(&mut ys);
+            Ok(Value::List(xs))
+        },
+        _ => Err(EvalError { message: "Invalid type for 'cons'".to_string() })
+    }
+}
+
 fn if_fn(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
     if xs.len() != 3 {
         return Err(EvalError { message: "'if' takes exactly three arguments".to_string() })
@@ -593,9 +636,9 @@ fn if_fn(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalErr
         _                    => return Err(EvalError { message: "'if' requires a boolean test".to_string() })
     };
     if test {
-        interpreter.eval_node(&xs[1])
+        Ok(Value::NodeWrapper(xs[1].clone()))
     } else {
-        interpreter.eval_node(&xs[2])
+        Ok(Value::NodeWrapper(xs[2].clone()))
     }
 }
 

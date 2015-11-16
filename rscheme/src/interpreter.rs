@@ -15,6 +15,7 @@ pub enum Value {
     List(Vec<Value>),
     Function(&'static str, Rc<fn(&mut Interpreter, &Vec<Node>) -> Result<Value, EvalError>>),
     Lambda(Lambda),
+    NodeWrapper(Node),
     Void
 }
 
@@ -49,6 +50,7 @@ impl fmt::Display for Value {
                 write!(f, "(lambda ({}) ({}))", params_str, lambda.body)
             },
             Value::Function(name, _) => write!(f, "{}", name),
+            Value::NodeWrapper(ref node) => write!(f, "{}", node),
             Value::Void            => write!(f, "()")
         }
     }
@@ -83,6 +85,16 @@ impl Interpreter {
     }
     
     pub fn eval_node(&mut self, node: &Node) -> Result<Value, EvalError> {
+        let mut node = node.clone();
+        loop {
+            match self.eval_node_wrapped(&node) {
+                Ok(Value::NodeWrapper(node_cont)) => node = node_cont,
+                val                               => return val
+            }
+        }
+    }
+    
+    pub fn eval_node_wrapped(&mut self, node: &Node) -> Result<Value, EvalError> {
         match node {
             &Node::ValueWrapper(ref val)  => Ok((**val).clone()),
             &Node::Int(val)               => Ok(Value::Int(val)),
@@ -121,12 +133,13 @@ impl Interpreter {
                                     Err(err) => Err(err)
                                  }
                             },
-                            Value::Lambda(lambda) => {
-                                self.eval_lambda(lambda, nodes)
+                            Value::Lambda(lambda)    => self.eval_lambda(lambda, nodes),
+                            Value::NodeWrapper(node) => {
+                                let mut node_vec: Vec<Node> = nodes.clone();
+                                node_vec[0] = node.clone();
+                                self.eval_node(&Node::List(node_vec))
                             },
-                            _ => {
-                                Ok(func_val.clone())
-                            }
+                            _ => Err(EvalError { message: "Invalid function call".to_string() })
                         }
                     },
                     Err(err) => Err(err)
@@ -144,8 +157,8 @@ impl Interpreter {
             return Err(EvalError { message: format!("{} expects {} params, got {}", nodes[0], params.len(), nodes.len() - 1).to_string() })
         }
 
-        for i in 0..params.len() {
-            match params[i] {
+        for (i, p) in params.iter().enumerate() {
+            match *p {
                 Node::Symbol(ref val) => {
                     match self.eval_node(&nodes[i + 1]) {
                         Ok(res) => env.set(val.clone(), res),
@@ -155,12 +168,11 @@ impl Interpreter {
                 _ => return Err(EvalError { message: format!("Invalid parameter {}", params[i]).to_string() })
             }
         }
-
         // Make a new interpreter, with the current interpreter as its outer scope
         let mut interpreter = Interpreter::new_with_env(env.clone());
         let body = interpreter.inline_lambda_nodes(body, params, &nodes[1..]);
-       
-        interpreter.eval(body)
+        
+        interpreter.eval_node_wrapped(&body)
     }
 
     fn inline_lambda_nodes(&mut self, node: Node, params: Vec<Node>, values: &[Node]) -> Node {
@@ -173,11 +185,13 @@ impl Interpreter {
                 Node::List(temp_list)
             },
             Node::Symbol(label) => {
-                for i in 0..params.len() {
-                    match params[i].clone() {
-                        Node::Symbol(param) => {
-                            if label == param {
-                                return values[i].clone()
+                for (i,p) in params.iter().enumerate() {
+                    match *p {
+                        Node::Symbol(ref param) => {
+                            if label == *param {
+                                if let Ok(val) = self.eval_node(&values[i]) {
+                                    return Node::ValueWrapper(Box::new(val));
+                                }
                             }
                         },
                         _ => ()

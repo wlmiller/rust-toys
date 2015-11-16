@@ -1,4 +1,4 @@
 [package]
 name = "rscheme"
-version = "0.1.0"
-authors = ["Neal Miller <neal.miller@rigminder.com>"]
+version = "0.2.0"
+authors = ["Neal Miller <wlmiller@gmail.com>"]

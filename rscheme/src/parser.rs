@@ -31,7 +31,7 @@ impl fmt::Display for Node {
                 }
                 write!(f, "({})", output)
             },
-            _ => write!(f, "_")
+            Node::ValueWrapper(ref val) => write!(f, "{}", val)
         }
     }
 }
