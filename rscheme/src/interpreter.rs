@@ -111,21 +111,7 @@ impl Interpreter {
                 match func_result {
                     Ok(func_val) => {
                         match func_val {
-                            Value::Symbol(val) => {
-                                if val == "quote".to_string() {
-                                    Ok(Interpreter::quote_node(nodes[1].clone()))
-                                } else if val == "lambda".to_string() {
-                                    let params: Vec<Node> = match nodes[1].clone() {
-                                        Node::List(nodes) => nodes,
-                                        _                 => Vec::new()
-                                    };
-                                    let body = nodes[2].clone();
-                                    let lambda = Lambda::new(params, body);
-                                    Ok(Value::Lambda(lambda))
-                                } else {
-                                    Err(EvalError { message: format!("Unknown function {}", val).to_string() })
-                                }
-                            },
+                            Value::Symbol(val) => Err(EvalError { message: format!("Unknown function {}", val).to_string() }),
                             Value::Function(_, func) => {
                                 let args = nodes[1..].to_vec();
                                 match func(self, &args) {
@@ -200,24 +186,6 @@ impl Interpreter {
                 node
             },
             _ => node
-        }
-    }
-    
-    fn quote_node(node: Node) -> Value {
-        match node {
-            Node::Int(int)          => Value::Literal(int.to_string()),
-            Node::Float(float)      => Value::Literal(float.to_string()),
-            Node::Symbol(ref value) => Value::Literal(value.clone()),
-            Node::Bool(true)        => Value::Literal("#t".to_string()),
-            Node::Bool(false)       => Value::Literal("#f".to_string()),
-            Node::List(nodes)       => {
-                let mut vals: Vec<Value> = Vec::new();
-                for node in nodes {
-                    vals.push(Interpreter::quote_node(node.clone()));
-                }
-                Value::List(vals)
-            },
-            _                       => Value::Void
         }
     }
 }

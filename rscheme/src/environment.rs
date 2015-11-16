@@ -78,6 +78,8 @@ impl Environment {
         env.insert("exp".to_string(),    Value::Function("exp", Rc::new(exp)));
         env.insert("log".to_string(),    Value::Function("log", Rc::new(log)));
         env.insert("log10".to_string(),  Value::Function("log10", Rc::new(log10)));
+        env.insert("quote".to_string(),  Value::Function("quote", Rc::new(quote)));
+        env.insert("lambda".to_string(), Value::Function("lambda", Rc::new(def_lambda)));
         env.insert("pi".to_string(),     Value::Float(consts::PI));
         env.insert("e".to_string(),      Value::Float(consts::E));
         
@@ -824,4 +826,39 @@ fn log10(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalErr
         Value::Float(float) => Ok(Value::Float(float.log10())),
         _                   => Err(EvalError { message: "Invalid type for 'log10'".to_string() })
     }
+}
+
+fn quote(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
+    if xs.len() != 1 {
+        return Err(EvalError { message: "'quote' takes exactly one argument".to_string() })
+    }
+    
+    Ok(match &xs[0] {
+        &Node::Int(int)          => Value::Literal(int.to_string()),
+        &Node::Float(float)      => Value::Literal(float.to_string()),
+        &Node::Symbol(ref value) => Value::Literal(value.clone()),
+        &Node::Bool(true)        => Value::Literal("#t".to_string()),
+        &Node::Bool(false)       => Value::Literal("#f".to_string()),
+        &Node::List(ref nodes)       => {
+            let mut vals: Vec<Value> = Vec::new();
+            for node in nodes {
+                vals.push(quote(interpreter, &vec![node.clone()]).ok().unwrap());
+            }
+            Value::List(vals)
+        },
+        _                       => Value::Void
+    })
+}
+
+fn def_lambda(_interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
+    if xs.len() != 2 {
+        return Err(EvalError { message: "'lambda' takes exactly two argumenta".to_string() })
+    }
+    
+    let params: Vec<Node> = match xs[0] {
+        Node::List(ref nodes) => nodes.clone(),
+        _                     => return Err(EvalError{ message: "lambda should provide a param list".to_string() })
+    };
+    let body = xs[1].clone();
+    Ok(Value::Lambda(Lambda::new(params, body)))
 }
