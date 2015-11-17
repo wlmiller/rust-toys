@@ -78,6 +78,7 @@ impl Environment {
         env.insert("exp".to_string(),    Value::Function("exp", Rc::new(exp)));
         env.insert("log".to_string(),    Value::Function("log", Rc::new(log)));
         env.insert("log10".to_string(),  Value::Function("log10", Rc::new(log10)));
+        env.insert("sqrt".to_string(),   Value::Function("sqrt", Rc::new(sqrt)));
         env.insert("quote".to_string(),  Value::Function("quote", Rc::new(quote)));
         env.insert("lambda".to_string(), Value::Function("lambda", Rc::new(def_lambda)));
         env.insert("pi".to_string(),     Value::Float(consts::PI));
@@ -146,10 +147,15 @@ fn add(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError
     };
 
     match (x, y) {
-        (Value::Int(x), Value::Int(y))     => Ok(Value::Int(x + y)),
-        (Value::Float(x), Value::Int(y))   => Ok(Value::Float(x + y as f64)),
-        (Value::Int(x), Value::Float(y))   => Ok(Value::Float(x as f64 + y)),
-        (Value::Float(x), Value::Float(y)) => Ok(Value::Float(x + y)),
+        (Value::Int(x), Value::Int(y))                 => Ok(Value::Int(x + y)),
+        (Value::Float(x), Value::Int(y))               => Ok(Value::Float(x + y as f64)),
+        (Value::Int(x), Value::Float(y))               => Ok(Value::Float(x as f64 + y)),
+        (Value::Float(x), Value::Float(y))             => Ok(Value::Float(x + y)),
+        (Value::Complex(xr,xi), Value::Int(y))         => Ok(Value::Complex(xr+y as f64,xi)),
+        (Value::Complex(xr,xi), Value::Float(y))       => Ok(Value::Complex(xr+y,xi)),
+        (Value::Int(x), Value::Complex(yr,yi))         => Ok(Value::Complex(x as f64+yr,yi)),
+        (Value::Float(x), Value::Complex(yr,yi))       => Ok(Value::Complex(x+yr,yi)),
+        (Value::Complex(xr,xi), Value::Complex(yr,yi)) => Ok(Value::Complex(xr+yr,xi+yi)),
         (Value::Symbol(val), _) | (_, Value::Symbol(val)) => Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
         _                                  => Err(EvalError { message: "Invalid types for '+'".to_string() })
     }
@@ -179,10 +185,15 @@ fn sub(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError
     
     if xs.len() < 3 {
         match (x, y) {
-            (Value::Int(x), Value::Int(y))     => Ok(Value::Int(x - y)),
-            (Value::Float(x), Value::Int(y))   => Ok(Value::Float(x - y as f64)),
-            (Value::Int(x), Value::Float(y))   => Ok(Value::Float(x as f64 - y)),
-            (Value::Float(x), Value::Float(y)) => Ok(Value::Float(x - y)),
+            (Value::Int(x), Value::Int(y))                 => Ok(Value::Int(x - y)),
+            (Value::Float(x), Value::Int(y))               => Ok(Value::Float(x - y as f64)),
+            (Value::Int(x), Value::Float(y))               => Ok(Value::Float(x as f64 - y)),
+            (Value::Float(x), Value::Float(y))             => Ok(Value::Float(x - y)),
+            (Value::Complex(xr,xi), Value::Int(y))         => Ok(Value::Complex(xr-y as f64,xi)),
+            (Value::Complex(xr,xi), Value::Float(y))       => Ok(Value::Complex(xr-y,xi)),
+            (Value::Int(x), Value::Complex(yr,yi))         => Ok(Value::Complex(x as f64-yr,yi)),
+            (Value::Float(x), Value::Complex(yr,yi))       => Ok(Value::Complex(x-yr,yi)),
+            (Value::Complex(xr,xi), Value::Complex(yr,yi)) => Ok(Value::Complex(xr-yr,xi-yi)),
             (Value::Symbol(val), _) | (_, Value::Symbol(val)) => Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
             _                                  => Err(EvalError { message: "Invalid types for '-'".to_string() })
         }
@@ -192,6 +203,11 @@ fn sub(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError
             (Value::Float(x), Value::Int(y))   => Node::Float(x - y as f64),
             (Value::Int(x), Value::Float(y))   => Node::Float(x as f64 - y),
             (Value::Float(x), Value::Float(y)) => Node::Float(x - y),
+            (Value::Complex(xr,xi), Value::Int(y))         => Node::Complex(xr-y as f64,xi),
+            (Value::Complex(xr,xi), Value::Float(y))       => Node::Complex(xr-y,xi),
+            (Value::Int(x), Value::Complex(yr,yi))         => Node::Complex(x as f64-yr,yi),
+            (Value::Float(x), Value::Complex(yr,yi))       => Node::Complex(x-yr,yi),
+            (Value::Complex(xr,xi), Value::Complex(yr,yi)) => Node::Complex(xr-yr,xi-yi),
             (Value::Symbol(val), _) | (_, Value::Symbol(val)) => return Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
             _                                  => return Err(EvalError { message: "Invalid types for '-'".to_string() })
         };
@@ -228,10 +244,15 @@ fn mul(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError
         err      => return err
     };
     match (x, y) {
-        (Value::Int(x), Value::Int(y))     => Ok(Value::Int(x * y)),
-        (Value::Float(x), Value::Int(y))   => Ok(Value::Float(x * y as f64)),
-        (Value::Int(x), Value::Float(y))   => Ok(Value::Float(x as f64 * y)),
-        (Value::Float(x), Value::Float(y)) => Ok(Value::Float(x * y)),
+        (Value::Int(x), Value::Int(y))                 => Ok(Value::Int(x * y)),
+        (Value::Float(x), Value::Int(y))               => Ok(Value::Float(x * y as f64)),
+        (Value::Int(x), Value::Float(y))               => Ok(Value::Float(x as f64 * y)),
+        (Value::Float(x), Value::Float(y))             => Ok(Value::Float(x * y)),
+        (Value::Complex(xr,xi), Value::Int(y))         => Ok(Value::Complex(xr*y as f64, xi*y as f64)),
+        (Value::Complex(xr,xi), Value::Float(y))       => Ok(Value::Complex(xr*y, xi)),
+        (Value::Int(x), Value::Complex(yr,yi))         => Ok(Value::Complex(x as f64*yr, x as f64*yi)),
+        (Value::Float(x), Value::Complex(yr,yi))       => Ok(Value::Complex(x*yr, x*yi)),
+        (Value::Complex(xr,xi), Value::Complex(yr,yi)) => Ok(Value::Complex(xr*yr - xi*yi, xr*yi + yr*xi)),
         (Value::Symbol(val), _) | (_, Value::Symbol(val)) => Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
         _                                  => Err(EvalError { message: "Invalid types for '*'".to_string() })
     }
@@ -262,22 +283,44 @@ fn div(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError
     if xs.len() < 3 {
         match (x, y) {
             (_, Value::Int(0)) | (_, Value::Float(0.0)) => Err(EvalError { message: "Invalid division by zero".to_string() }),
-            (Value::Int(x), Value::Int(y))     => Ok(Value::Int(x / y)),
-            (Value::Float(x), Value::Int(y))   => Ok(Value::Float(x / y as f64)),
-            (Value::Int(x), Value::Float(y))   => Ok(Value::Float(x as f64 / y)),
-            (Value::Float(x), Value::Float(y)) => Ok(Value::Float(x / y)),
+            (Value::Int(x), Value::Int(y))                    => Ok(Value::Int(x / y)),
+            (Value::Float(x), Value::Int(y))                  => Ok(Value::Float(x / y as f64)),
+            (Value::Int(x), Value::Float(y))                  => Ok(Value::Float(x as f64 / y)),
+            (Value::Float(x), Value::Float(y))                => Ok(Value::Float(x / y)),
+            (Value::Complex(xr,xi), Value::Int(y))            => Ok(Value::Complex(xr/y as f64,xi/y as f64)),
+            (Value::Complex(xr,xi), Value::Float(y))          => Ok(Value::Complex(xr/y,xi/y)),
             (Value::Symbol(val), _) | (_, Value::Symbol(val)) => Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
+            (x, Value::Complex(yr, yi))                       => {
+                let den = yr*yr + yi*yi;
+                match x {
+                    Value::Int(x)         => Ok(Value::Complex(x as f64*yr/den, -x as f64*yi/den)),
+                    Value::Float(x)       => Ok(Value::Complex(x*yr/den, -x*yi/den)),
+                    Value::Complex(xr,xi) => Ok(Value::Complex((xr*yr + xi*yi)/den, (xi*yr - xr*yi)/den)),
+                    _                     => Err(EvalError { message: "Invalid types for '/'".to_string() })
+                }
+            },
             _                                  => Err(EvalError { message: "Invalid types for '/'".to_string() })
         }
     } else {
         let x_div_y = match (x, y) {
             (_, Value::Int(0)) | (_, Value::Float(0.0)) => return Err(EvalError { message: "Invalid division by zero".to_string() }),
-            (Value::Int(x), Value::Int(y))     => Node::Int(x / y),
-            (Value::Float(x), Value::Int(y))   => Node::Float(x / y as f64),
-            (Value::Int(x), Value::Float(y))   => Node::Float(x as f64 / y),
-            (Value::Float(x), Value::Float(y)) => Node::Float(x / y),
+            (Value::Int(x), Value::Int(y))                    => Node::Int(x / y),
+            (Value::Float(x), Value::Int(y))                  => Node::Float(x / y as f64),
+            (Value::Int(x), Value::Float(y))                  => Node::Float(x as f64 / y),
+            (Value::Float(x), Value::Float(y))                => Node::Float(x / y),
             (Value::Symbol(val), _) | (_, Value::Symbol(val)) => return Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
-            _                                  => return Err(EvalError { message: "Invalid types for '/'".to_string() })
+            (Value::Complex(xr,xi), Value::Int(y))            => Node::Complex(xr/y as f64,xi/y as f64),
+            (Value::Complex(xr,xi), Value::Float(y))          => Node::Complex(xr/y,xi/y),
+            (x, Value::Complex(yr, yi))                       => {
+                let den = yr*yr + yi*yi;
+                match x {
+                    Value::Int(x)         => Node::Complex(x as f64*yr/den, -x as f64*yi/den),
+                    Value::Float(x)       => Node::Complex(x*yr/den, -x*yi/den),
+                    Value::Complex(xr,xi) => Node::Complex((xr*yr + xi*yi)/den, (xi*yr - xr*yi)/den),
+                    _                     => return Err(EvalError { message: "Invalid types for '/'".to_string() })
+                }
+            },
+            _                                                  => return Err(EvalError { message: "Invalid types for '/'".to_string() })
         };
     
         let mut xs = xs.clone();
@@ -312,19 +355,29 @@ fn pow(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError
     }
 }
 
-pub fn def(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
-    if xs.len() != 2 {
-        return Err(EvalError { message: "'define' takes exactly two arguments".to_string() })
-    }
-    
+pub fn def(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {   
     let x = xs[0].clone();
-    let y = match interpreter.eval_node(&xs[1]) {
-        Ok(val) => val,
-        err     => return err
-    };
 
-    match (x, y) {
-        (Node::Symbol(label), val) => { interpreter.env.set(label, val); Ok(Value::Void) },
+    match x {
+        Node::List(nodes) => {
+            let params = &nodes[1..].to_vec();
+            let body = if xs.len() > 2 {
+                let mut newbody = xs.clone();
+                newbody[0] = Node::Symbol("begin".to_string());
+                Node::List(newbody)
+            } else {
+                xs[1].clone()
+            };
+            let lambda = Node::ValueWrapper(Box::new(Value::Lambda(Lambda { params: params.clone(), body: body.clone() })));
+            def(interpreter, &vec![nodes[0].clone(), lambda])
+        },
+        Node::Symbol(label) => {
+            let y = match interpreter.eval_node(&xs[1]) {
+                Ok(val) => val,
+                err     => return err
+            };
+            interpreter.env.set(label, y); Ok(Value::Void)
+        },
         _ => Err(EvalError { message: format!("Can't define {}", xs[0]).to_string() })
     }
 }
@@ -439,11 +492,17 @@ fn eq(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError>
         err     => return err
     };
     match (x, y) {
-        (Value::Int(x), Value::Int(y))         => Ok(Value::Bool(x == y)),
-        (Value::Float(x), Value::Int(y))       => Ok(Value::Bool(x == y as f64)),
-        (Value::Int(x), Value::Float(y))       => Ok(Value::Bool(x as f64 == y)),
-        (Value::Float(x), Value::Float(y))     => Ok(Value::Bool(x == y)),
-        (Value::Literal(x), Value::Literal(y)) => Ok(Value::Bool(x == y)),
+        (Value::Int(x), Value::Int(y))                   => Ok(Value::Bool(x == y)),
+        (Value::Float(x), Value::Int(y))                 => Ok(Value::Bool(x == y as f64)),
+        (Value::Int(x), Value::Float(y))                 => Ok(Value::Bool(x as f64 == y)),
+        (Value::Float(x), Value::Float(y))               => Ok(Value::Bool(x == y)),
+        (Value::Complex(xr, xi), Value::Int(y))          => Ok(Value::Bool(xr == y as f64 && xi == 0.0)),
+        (Value::Complex(xr, xi), Value::Float(y))        => Ok(Value::Bool(xr == y && xi == 0.0)),
+        (Value::Int(x), Value::Complex(yr, yi))          => Ok(Value::Bool(x as f64== yr && yi == 0.0)),
+        (Value::Float(x), Value::Complex(yr, yi))        => Ok(Value::Bool(x == yr && yi == 0.0)),
+        (Value::Complex(xr, xi), Value::Complex(yr, yi)) => Ok(Value::Bool(xr == yr && xi == yi)),
+        (Value::Literal(x), Value::Literal(y))           => Ok(Value::Bool(x == y)),
+        (Value::String(x), Value::String(y))             => Ok(Value::Bool(x == y)),
         (Value::Symbol(val), _) | (_, Value::Symbol(val)) => Err(EvalError { message: format!("Unknown symbol {}", val).to_string() }),
         _                                  => Err(EvalError { message: "Invalid types for '='".to_string() })
     }
@@ -632,10 +691,11 @@ fn if_fn(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalErr
     if xs.len() != 3 {
         return Err(EvalError { message: "'if' takes exactly three arguments".to_string() })
     }
-    
+
     let test: bool = match interpreter.eval_node(&xs[0]) {
         Ok(Value::Bool(val)) => val,
-        _                    => return Err(EvalError { message: "'if' requires a boolean test".to_string() })
+        Ok(_)              => return Err(EvalError { message: "'if' requires a boolean test".to_string() }),
+        Err(err)             => return Err(err)
     };
     if test {
         Ok(Value::NodeWrapper(xs[1].clone()))
@@ -825,6 +885,22 @@ fn log10(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalErr
         Value::Int(int)     => Ok(Value::Float((int as f64).log10())),
         Value::Float(float) => Ok(Value::Float(float.log10())),
         _                   => Err(EvalError { message: "Invalid type for 'log10'".to_string() })
+    }
+}
+
+fn sqrt(interpreter: &mut Interpreter, xs: &Vec<Node>) -> Result<Value, EvalError> {
+    if xs.len() != 1 {
+        return Err(EvalError { message: "'sqrt' takes exactly one argument".to_string() })
+    }
+    
+    let x = match interpreter.eval_node(&xs[0]) {
+        Ok(val) => val,
+        err     => return err
+    };
+    match x {
+        Value::Int(int)     => Ok(Value::Float((int as f64).sqrt())),
+        Value::Float(float) => Ok(Value::Float(float.sqrt())),
+        _                   => Err(EvalError { message: "Invalid type for 'sqrt'".to_string() })
     }
 }
 

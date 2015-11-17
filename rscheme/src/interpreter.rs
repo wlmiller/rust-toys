@@ -9,12 +9,15 @@ use parser::Node as Node;
 pub enum Value {
     Int(i32),
     Float(f64),
+    Complex(f64, f64),
     Bool(bool),
     Symbol(String),
     Literal(String),
+    String(String),
     List(Vec<Value>),
     Function(&'static str, Rc<fn(&mut Interpreter, &Vec<Node>) -> Result<Value, EvalError>>),
     Lambda(Lambda),
+    // NodeWrappers are used to pass uneval'd nodes out for TCO
     NodeWrapper(Node),
     Void
 }
@@ -28,9 +31,13 @@ impl fmt::Display for Value {
         match *self {
             Value::Int(val)          => write!(f, "{}", val),
             Value::Float(val)        => write!(f, "{}", val),
+            Value::Complex(real, 0.0)  => write!(f, "{}", real),
+            Value::Complex(real, im) if im < 0.0 => write!(f, "{}-{}i", real, -im),
+            Value::Complex(real, im) => write!(f, "{}+{}i", real, im),
             Value::Bool(true)        => write!(f, "#t"),
             Value::Bool(false)       => write!(f, "#f"),
             Value::Symbol(ref val) | Value::Literal(ref val) => write!(f, "{}", val),
+            Value::String(ref val)   => write!(f, "\"{}\"", val.replace("\"","\\\"")),
             Value::List(ref vals)    => {
                 let mut output = String::new();
                 let mut sep = String::new();
@@ -99,14 +106,16 @@ impl Interpreter {
             &Node::ValueWrapper(ref val)  => Ok((**val).clone()),
             &Node::Int(val)               => Ok(Value::Int(val)),
             &Node::Float(val)             => Ok(Value::Float(val)),
+            &Node::Complex(real, im)      => Ok(Value::Complex(real, im)),
             &Node::Bool(val)              => Ok(Value::Bool(val)),
-            &Node::Symbol(ref val)            => {
+            &Node::Symbol(ref val)        => {
                 match self.env.get(&val) {
                     Some(res) => Ok(res.clone()),
                     None => Ok(Value::Symbol(val.clone()))
                 }
-            }
-            &Node::List(ref nodes)  => {
+            },
+            &Node::String(ref val)        => Ok(Value::String(val.clone())),
+            &Node::List(ref nodes)        => {
                 let func_result = self.eval_node(&nodes[0]);
                 match func_result {
                     Ok(func_val) => {
